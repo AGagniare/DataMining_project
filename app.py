@@ -1,3 +1,4 @@
+import numpy as np
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -6,6 +7,8 @@ from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from sklearn.cluster import KMeans, DBSCAN
 from sklearn.linear_model import LinearRegression
 from sklearn.tree import DecisionTreeRegressor
+from sklearn.metrics import calinski_harabasz_score, davies_bouldin_score
+from sklearn.decomposition import PCA
 
 st.title("Data Mining Project by Gagniare Arthur & Aali Andella Mohamed")
 
@@ -99,33 +102,36 @@ def visualize_data(df):
         ax.boxplot(df[selected_column_box])
         st.pyplot(fig)
 
-def clustering(df):
-    st.subheader("Clustering")
-    show_cluster_plot = st.sidebar.checkbox("Show Cluster Plot")
-    clustering_option = st.selectbox("Choose clustering algorithm", ["K-Means", "DBSCAN"])
+def evaluate_clusters(df, labels, clustering_method, kmeans=None):
+    st.subheader("Cluster Evaluation")
 
-    new_df = df.copy(deep=True)
+    # Visualization of clusters
+    if len(df.columns) > 1:
+        col1 = st.selectbox("Select X-axis column for cluster visualization", df.columns)
+        col2 = st.selectbox("Select Y-axis column for cluster visualization", df.columns)
+        pca = PCA(n_components=2)
+        df_pca = pd.DataFrame(pca.fit_transform(df), columns=['PCA1', 'PCA2'])
 
-    if clustering_option == "K-Means":
-        n_clusters = st.slider("Select number of clusters", 2, 10, 5)
-        kmeans = KMeans(n_clusters=n_clusters)
-        labels = kmeans.fit_predict(new_df)
-        new_df['Cluster'] = labels
-        st.write("Clustering results:")
-        st.write(new_df)
-        if show_cluster_plot:
-            plot_clusters(new_df, labels, n_clusters)
+        fig, ax = plt.subplots()
+        scatter = ax.scatter(df_pca['PCA1'], df_pca['PCA2'], c=labels, cmap='viridis')
+        legend = ax.legend(*scatter.legend_elements(), title="Clusters")
+        ax.add_artist(legend)
+        st.pyplot(fig)
 
-    elif clustering_option == "DBSCAN":
-        eps = st.slider("Select epsilon value", 0.1, 10.0, 3.5)
-        min_samples = st.slider("Select minimum samples", 1, 10, 5)
-        dbscan = DBSCAN(eps=eps, min_samples=min_samples)
-        labels = dbscan.fit_predict(new_df)
-        new_df['Cluster'] = labels
-        st.write("Clustering results:")
-        st.write(new_df)
-        if show_cluster_plot:
-            plot_clusters(new_df, labels, -1)
+    # Cluster statistics
+    st.write("Cluster Statistics:")
+    unique_labels = set(labels)
+    for label in unique_labels:
+        st.write(f"Cluster {label}:")
+        st.write(f"Number of data points: {sum(labels == label)}")
+        if clustering_method == 'K-Means':
+            cluster_center = kmeans.cluster_centers_[label]
+            st.write(f"Cluster center: {cluster_center}")
+        elif clustering_method == 'DBSCAN':
+            cluster_data = df_pca[labels == label]
+            cluster_center = cluster_data.mean(axis=0)
+            cluster_density = sum(labels == label) / (df_pca.loc[labels == label].apply(lambda x: np.linalg.norm(x - cluster_center), axis=1).mean())
+            st.write(f"Cluster density: {cluster_density}")
 
 def plot_clusters(df, labels, n_clusters):
     if len(df.columns) >= 2:
@@ -143,13 +149,44 @@ def plot_clusters(df, labels, n_clusters):
     else:
         st.warning("Not enough columns for 2D visualization. Minimum 2 columns required.")
 
+# Updated clustering function with evaluation
+def clustering(df):
+    st.subheader("Clustering")
+    show_cluster_plot = st.sidebar.checkbox("Show Cluster Plot")
+    clustering_option = st.selectbox("Choose clustering algorithm", ["K-Means", "DBSCAN"])
+
+    new_df = df.copy(deep=True)
+
+    if clustering_option == "K-Means":
+        n_clusters = st.slider("Select number of clusters", 2, 10, 5)
+        kmeans = KMeans(n_clusters=n_clusters)
+        labels = kmeans.fit_predict(new_df)
+        new_df['Cluster'] = labels
+        st.write("Clustering results:")
+        st.write(new_df)
+        if show_cluster_plot:
+            plot_clusters(new_df, labels, n_clusters)
+        evaluate_clusters(new_df, labels, 'K-Means', kmeans)
+
+    elif clustering_option == "DBSCAN":
+        eps = st.slider("Select epsilon value", 0.1, 10.0, 3.5)
+        min_samples = st.slider("Select minimum samples", 1, 10, 5)
+        dbscan = DBSCAN(eps=eps, min_samples=min_samples)
+        labels = dbscan.fit_predict(new_df)
+        new_df['Cluster'] = labels
+        st.write("Clustering results:")
+        st.write(new_df)
+        if show_cluster_plot:
+            plot_clusters(new_df, labels, -1)
+        evaluate_clusters(new_df, labels, 'DBSCAN')
+
 def prediction(df):
     st.subheader("Prediction")
     prediction_option = st.selectbox("Choose prediction algorithm", ["Linear Regression", "Decision Tree Regression"])
 
     if prediction_option == "Linear Regression":
         feature_cols = st.multiselect("Select feature columns", df.columns)
-        target_col = st.multiselect("Select target column", df.columns)
+        target_col = st.selectbox("Select target column", df.columns)
 
         if feature_cols and target_col:
             X = df[feature_cols]
@@ -164,7 +201,7 @@ def prediction(df):
 
     elif prediction_option == "Decision Tree Regression":
         feature_cols = st.multiselect("Select feature columns", df.columns)
-        target_col = st.multiselect("Select target column", df.columns)
+        target_col = st.selectbox("Select target column", df.columns)
 
         if feature_cols and target_col:
             X = df[feature_cols]
@@ -175,6 +212,36 @@ def prediction(df):
 
             st.write("Decision Tree Regression Model:")
             st.write("Feature Importances:", model.feature_importances_)
+
+def determine_optimal_clusters(df):
+    st.subheader("Optimal Number of Clusters")
+    max_clusters = st.slider("Select maximum number of clusters", 2, 20, 10)
+
+    ch_scores = []
+    db_scores = []
+
+    for k in range(2, max_clusters + 1):
+        kmeans = KMeans(n_clusters=k)
+        labels = kmeans.fit_predict(df)
+        ch_scores.append(calinski_harabasz_score(df, labels))
+        db_scores.append(davies_bouldin_score(df, labels))
+
+    fig, ax = plt.subplots(1, 2, figsize=(15, 5))
+
+    ax[0].plot(range(2, max_clusters + 1), ch_scores, marker='o')
+    ax[0].set_title('Calinski-Harabasz Index')
+    ax[0].set_xlabel('Number of Clusters')
+    ax[0].set_ylabel('Score')
+
+    ax[1].plot(range(2, max_clusters + 1), db_scores, marker='o')
+    ax[1].set_title('Davies-Bouldin Index')
+    ax[1].set_xlabel('Number of Clusters')
+    ax[1].set_ylabel('Score')
+
+    st.pyplot(fig)
+
+    st.write("Optimal number of clusters based on Calinski-Harabasz Index:", ch_scores.index(max(ch_scores)) + 2)
+    st.write("Optimal number of clusters based on Davies-Bouldin Index:", db_scores.index(min(db_scores)) + 2)
 
 # Upload CSV file
 uploaded_file = st.file_uploader("Choose a CSV file", type="csv")
@@ -193,5 +260,7 @@ if uploaded_file:
     visualize_data(df)
 
     clustering(df)
+
+    determine_optimal_clusters(df)
 
     prediction(df)
