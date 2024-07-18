@@ -101,6 +101,7 @@ def visualize_data(df):
 
 def clustering(df):
     st.subheader("Clustering")
+    show_cluster_plot = st.sidebar.checkbox("Show Cluster Plot")
     clustering_option = st.selectbox("Choose clustering algorithm", ["K-Means", "DBSCAN"])
 
     new_df = df.copy(deep=True)
@@ -112,7 +113,8 @@ def clustering(df):
         new_df['Cluster'] = labels
         st.write("Clustering results:")
         st.write(new_df)
-        plot_clusters(new_df, labels, n_clusters)
+        if show_cluster_plot:
+            plot_clusters(new_df, labels, n_clusters)
 
     elif clustering_option == "DBSCAN":
         eps = st.slider("Select epsilon value", 0.1, 10.0, 3.5)
@@ -122,7 +124,8 @@ def clustering(df):
         new_df['Cluster'] = labels
         st.write("Clustering results:")
         st.write(new_df)
-        plot_clusters(new_df, labels, -1)
+        if show_cluster_plot:
+            plot_clusters(new_df, labels, -1)
 
 def plot_clusters(df, labels, n_clusters):
     if len(df.columns) >= 2:
