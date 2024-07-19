@@ -6,9 +6,11 @@ from sklearn.impute import KNNImputer
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from sklearn.cluster import KMeans, DBSCAN
 from sklearn.linear_model import LinearRegression
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.tree import DecisionTreeRegressor
-from sklearn.metrics import calinski_harabasz_score, davies_bouldin_score
+from sklearn.metrics import calinski_harabasz_score, davies_bouldin_score, accuracy_score
 from sklearn.decomposition import PCA
+from sklearn.model_selection import train_test_split
 
 st.title("Data Mining Project by Gagniare Arthur & Aali Andella Mohamed")
 
@@ -182,7 +184,7 @@ def clustering(df):
 
 def prediction(df):
     st.subheader("Prediction")
-    prediction_option = st.selectbox("Choose prediction algorithm", ["Linear Regression", "Decision Tree Regression"])
+    prediction_option = st.selectbox("Choose prediction algorithm", ["Linear Regression", "Decision Tree Regression", "Random Forest Classification"])
 
     if prediction_option == "Linear Regression":
         feature_cols = st.multiselect("Select feature columns", df.columns)
@@ -212,6 +214,25 @@ def prediction(df):
 
             st.write("Decision Tree Regression Model:")
             st.write("Feature Importances:", model.feature_importances_)
+
+    elif prediction_option == "Random Forest Classification":
+        feature_cols = st.multiselect("Select feature columns", df.columns)
+        target_col = st.selectbox("Select target column", df.columns)
+
+        if feature_cols and target_col:
+            X = df[feature_cols]
+            y = df[target_col]
+
+            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=5)
+
+            model = RandomForestClassifier()
+            model.fit(X_train, y_train)
+
+            y_pred = model.predict(X_test)
+            accuracy = accuracy_score(y_test, y_pred)
+
+            st.write("Random Forest Classification Model:")
+            st.write("Accuracy:", accuracy)
 
 def determine_optimal_clusters(df):
     st.subheader("Optimal Number of Clusters")
@@ -265,8 +286,8 @@ if uploaded_file:
 
     visualize_data(df)
 
-    clustering(df)
+    # clustering(df)
 
-    determine_optimal_clusters(df)
+    # determine_optimal_clusters(df)
 
     prediction(df)
