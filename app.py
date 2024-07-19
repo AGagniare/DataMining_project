@@ -248,7 +248,13 @@ uploaded_file = st.file_uploader("Choose a CSV file", type="csv")
 if uploaded_file:
     header = st.text_input("Enter header row number", value="0")
     sep = st.text_input("Enter separator (e.g., , or ;)", value=",")
-    df = pd.read_csv(uploaded_file, header=int(header), sep=sep)
+    df = pd.read_csv(uploaded_file, header=None, sep=sep)
+    
+    # Rename columns
+    num_columns = len(df.columns)
+    column_names = [f"Feature{i}" for i in range(num_columns - 1)] + ["Class"]
+    df.columns = column_names
+    
     copy_df = df.copy(deep=True)
 
     data_exploration(copy_df)
