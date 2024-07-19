@@ -5,14 +5,13 @@ import matplotlib.pyplot as plt
 from sklearn.impute import KNNImputer
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from sklearn.cluster import KMeans, DBSCAN
-from sklearn.linear_model import LinearRegression
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.tree import DecisionTreeRegressor
-from sklearn.metrics import calinski_harabasz_score, davies_bouldin_score, accuracy_score
+from sklearn.metrics import accuracy_score, recall_score, f1_score, confusion_matrix
 from sklearn.decomposition import PCA
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import LabelEncoder
+
 
 st.title("Data Mining Project by Gagniare Arthur & Aali Andella Mohamed")
 
@@ -126,7 +125,7 @@ def evaluate_clusters(df, labels, clustering_method, kmeans=None):
 
         fig, ax = plt.subplots()
         scatter = ax.scatter(df_pca['PCA1'], df_pca['PCA2'], c=labels, cmap='viridis')
-        legend = ax.legend(*scatter.legend_elements(), title="Clusters")
+        legend = ax.legend(*scatter.legend_elements(), title="Clusters", loc="upper left")
         ax.add_artist(legend)
 
         # Mark the cluster centers
@@ -203,18 +202,20 @@ def prediction(df, copy_df, target_col):
             model.fit(X_train, y_train)
             y_pred = model.predict(X_test)
 
-            st.write("Prediction results:")
-            st.write(pd.DataFrame({"Actual": label_encoder.inverse_transform(y_test), "Predicted": label_encoder.inverse_transform(y_pred)}))
-            st.write("Model Accuracy:", accuracy_score(y_test, y_pred))
+            
 
         elif prediction_option == "Logistic Regression":
             model = LogisticRegression()
             model.fit(X_train, y_train)
             y_pred = model.predict(X_test)
 
-            st.write("Prediction results:")
-            st.write(pd.DataFrame({"Actual": label_encoder.inverse_transform(y_test), "Predicted": label_encoder.inverse_transform(y_pred)}))
-            st.write("Model Accuracy:", accuracy_score(y_test, y_pred))
+        st.write("Prediction results:")
+        st.write(pd.DataFrame({"Actual": label_encoder.inverse_transform(y_test), "Predicted": label_encoder.inverse_transform(y_pred)}))
+        st.write("Model Accuracy:", accuracy_score(y_test, y_pred))
+        st.write("Model Recall:", recall_score(y_test, y_pred, average='binary'))
+        st.write("Model F1-Score:", f1_score(y_test, y_pred, average='binary'))
+        st.write("Confusion Matrix:")
+        st.write(confusion_matrix(y_test, y_pred))
 
 def main():
     # File upload
