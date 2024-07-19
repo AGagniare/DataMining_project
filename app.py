@@ -14,6 +14,14 @@ from sklearn.model_selection import train_test_split
 
 st.title("Data Mining Project by Gagniare Arthur & Aali Andella Mohamed")
 
+# Initialize session state variables
+if 'df' not in st.session_state:
+    st.session_state.df = None
+if 'cleaned_df' not in st.session_state:
+    st.session_state.cleaned_df = None
+if 'normalized_df' not in st.session_state:
+    st.session_state.normalized_df = None
+
 def handle_missing_values(df, method):
     if method == "Delete rows":
         df_cleaned = df.dropna()
@@ -60,29 +68,30 @@ def data_exploration(df):
 
 def handle_missing_values_ui(df):
     st.subheader("Missing Value Handling")
-    missing_value_option = st.selectbox("Choose method to handle missing values", ["Delete rows", "Delete columns", "Replace with mean", "Replace with median", "Replace with mode", "KNN Imputation"])
+    missing_value_option = st.selectbox("Choose method to handle missing values", ["None","Delete rows", "Delete columns", "Replace with mean", "Replace with median", "Replace with mode", "KNN Imputation"])
 
-    if st.button("Handle Missing Values"):
-        df_cleaned = handle_missing_values(df, missing_value_option)
+    if missing_value_option != "None":
+        st.session_state.cleaned_df = handle_missing_values(df, missing_value_option)
         st.write("Data after handling missing values:")
-        st.write(df_cleaned)
-        return df_cleaned
-    return df
+        st.write(st.session_state.cleaned_df)
+        return st.session_state.cleaned_df
+    else:
+        st.write("No missing value handling applied.")
+        return df
+
 
 def normalize_data_ui(df):
     st.subheader("Data Normalization")
     normalization_option = st.selectbox("Choose normalization method", ["None", "Min-Max", "Z-score"])
     numeric_columns = df.select_dtypes(include=['number']).columns
-
-    if st.button("Normalize Data"):
-        if normalization_option != "None":
-            df_normalized = normalize_data(df, normalization_option, numeric_columns)
-            st.write("Normalized data:")
-            st.write(df_normalized)
-            return df_normalized
-        else:
-            st.write("No normalization applied.")
-    return df
+    if normalization_option != "None":
+        st.session_state.normalized_df = normalize_data(df, normalization_option, numeric_columns)
+        st.write("Normalized data:")
+        st.write(st.session_state.normalized_df)
+        return st.session_state.normalized_df
+    else:
+        st.write("No normalization applied.")
+        return df
 
 def visualize_data(df):
     st.subheader("Data Visualization")
@@ -194,12 +203,14 @@ def prediction(df, copy_df):
             X = df[feature_cols]
             y = copy_df[target_col]
 
+            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
             model = LinearRegression()
-            model.fit(X, y)
+            model.fit(X_train, y_train)
+            y_pred = model.predict(X_test)
 
-            st.write("Linear Regression Model:")
-            st.write("Coefficients:", model.coef_)
-            st.write("Intercept:", model.intercept_)
+            st.write("Prediction results:")
+            st.write(pd.DataFrame({"Actual": y_test, "Predicted": y_pred}))
+            st.write("Model Coefficients:", model.coef_)
 
     elif prediction_option == "Decision Tree Regression":
         feature_cols = st.multiselect("Select feature columns", df.columns)
@@ -209,11 +220,13 @@ def prediction(df, copy_df):
             X = df[feature_cols]
             y = copy_df[target_col]
 
+            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
             model = DecisionTreeRegressor()
-            model.fit(X, y)
+            model.fit(X_train, y_train)
+            y_pred = model.predict(X_test)
 
-            st.write("Decision Tree Regression Model:")
-            st.write("Feature Importances:", model.feature_importances_)
+            st.write("Prediction results:")
+            st.write(pd.DataFrame({"Actual": y_test, "Predicted": y_pred}))
 
     elif prediction_option == "Random Forest Classification":
         feature_cols = st.multiselect("Select feature columns", df.columns)
@@ -223,82 +236,48 @@ def prediction(df, copy_df):
             X = df[feature_cols]
             y = copy_df[target_col]
 
-            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=5)
-
+            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
             model = RandomForestClassifier()
             model.fit(X_train, y_train)
-
             y_pred = model.predict(X_test)
-            accuracy = accuracy_score(y_test, y_pred)
 
-            st.write("Random Forest Classification Model:")
-            st.write("Accuracy:", accuracy)
+            st.write("Prediction results:")
+            st.write(pd.DataFrame({"Actual": y_test, "Predicted": y_pred}))
+            st.write("Model Accuracy:", accuracy_score(y_test, y_pred))
 
-def determine_optimal_clusters(df):
-    st.subheader("Optimal Number of Clusters")
-    max_clusters = st.slider("Select maximum number of clusters", 2, 20, 10)
-
-    ch_scores = []
-    db_scores = []
-
-    for k in range(2, max_clusters + 1):
-        kmeans = KMeans(n_clusters=k)
-        labels = kmeans.fit_predict(df)
-        ch_scores.append(calinski_harabasz_score(df, labels))
-        db_scores.append(davies_bouldin_score(df, labels))
-
-    fig, ax = plt.subplots(1, 2, figsize=(15, 5))
-
-    ax[0].plot(range(2, max_clusters + 1), ch_scores, marker='o')
-    ax[0].set_title('Calinski-Harabasz Index')
-    ax[0].set_xlabel('Number of Clusters')
-    ax[0].set_ylabel('Score')
-
-    ax[1].plot(range(2, max_clusters + 1), db_scores, marker='o')
-    ax[1].set_title('Davies-Bouldin Index')
-    ax[1].set_xlabel('Number of Clusters')
-    ax[1].set_ylabel('Score')
-
-    st.pyplot(fig)
-
-    st.write("Optimal number of clusters based on Calinski-Harabasz Index:", ch_scores.index(max(ch_scores)) + 2)
-    st.write("Optimal number of clusters based on Davies-Bouldin Index:", db_scores.index(min(db_scores)) + 2)
-
-st.cache_resource
 def main():
-    # Upload CSV file
-    uploaded_file = st.file_uploader("Choose a CSV file", type="csv")
-    if uploaded_file:
-        # header = st.text_input("Enter header row number", value="0")
-        sep = st.text_input("Enter separator (e.g., , or ;)", value=",")
-        df = pd.read_csv(uploaded_file, header=None, sep=sep)
-            
-        # Rename columns
+    if uploaded_file is not None:
+        df = pd.read_csv(uploaded_file, header=None)
         num_columns = len(df.columns)
         column_names = [f"Feature{i}" for i in range(num_columns - 1)] + ["Class"]
         df.columns = column_names
-            
         copy_df = df.copy(deep=True)
 
         # Remove and store target column
         target_col = column_names[-1]
         df = df.drop(target_col, axis=1)
 
+        st.session_state.df = df  # Store original data in session state
+        st.session_state.copy_df = copy_df
         data_exploration(copy_df)
+        
+        # Handling missing values and normalization
+        cleaned_df = handle_missing_values_ui(st.session_state.df)
+        normalized_df = normalize_data_ui(st.session_state.cleaned_df if st.session_state.cleaned_df is not None else st.session_state.df)
+        
+        # Store intermediate data states in session state
+        if cleaned_df is not None:
+            st.session_state.cleaned_df = cleaned_df
+        if normalized_df is not None:
+            st.session_state.normalized_df = normalized_df
 
-        df = handle_missing_values_ui(df)
+        # Clustering and Prediction
+        clustering(st.session_state.normalized_df if st.session_state.normalized_df is not None else st.session_state.cleaned_df if st.session_state.cleaned_df is not None else st.session_state.df)
+        prediction(st.session_state.normalized_df if st.session_state.normalized_df is not None else st.session_state.cleaned_df if st.session_state.cleaned_df is not None else df, st.session_state.copy_df)
+    else:
+        st.warning("Please upload a CSV file to proceed.")
 
-        df = normalize_data_ui(df)
-
-        visualize_data(df)
-
-        clustering(df)
-
-        determine_optimal_clusters(df)
-
-        prediction(df, copy_df)
-
-
-# main function
 if __name__ == "__main__":
+    # File upload
+    uploaded_file = st.file_uploader("Choose a CSV file", type="csv")
     main()
