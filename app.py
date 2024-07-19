@@ -68,7 +68,7 @@ def data_exploration(df):
 
 def handle_missing_values_ui(df):
     st.subheader("Missing Value Handling")
-    missing_value_option = st.selectbox("Choose method to handle missing values", ["None","Delete rows", "Delete columns", "Replace with mean", "Replace with median", "Replace with mode", "KNN Imputation"])
+    missing_value_option = st.selectbox("Choose method to handle missing values", ["None", "Delete rows", "Delete columns", "Replace with mean", "Replace with median", "Replace with mode", "KNN Imputation"])
 
     if missing_value_option != "None":
         st.session_state.cleaned_df = handle_missing_values(df, missing_value_option)
@@ -78,7 +78,6 @@ def handle_missing_values_ui(df):
     else:
         st.write("No missing value handling applied.")
         return df
-
 
 def normalize_data_ui(df):
     st.subheader("Data Normalization")
@@ -121,12 +120,20 @@ def evaluate_clusters(df, labels, clustering_method, kmeans=None):
         col1 = st.selectbox("Select X-axis column for cluster visualization", df.columns)
         col2 = st.selectbox("Select Y-axis column for cluster visualization", df.columns)
         pca = PCA(n_components=2)
-        df_pca = pd.DataFrame(pca.fit_transform(df), columns=['PCA1', 'PCA2'])
+        df_pca = pd.DataFrame(pca.fit_transform(df.drop(columns=['Cluster'])), columns=['PCA1', 'PCA2'])
 
         fig, ax = plt.subplots()
         scatter = ax.scatter(df_pca['PCA1'], df_pca['PCA2'], c=labels, cmap='viridis')
         legend = ax.legend(*scatter.legend_elements(), title="Clusters")
         ax.add_artist(legend)
+
+        # Mark the cluster centers
+        if clustering_method == 'K-Means' and kmeans is not None:
+            centers = kmeans.cluster_centers_
+            centers_pca = pca.transform(centers)
+            ax.scatter(centers_pca[:, 0], centers_pca[:, 1], c='red', marker='x', s=200, label='Centers')
+            ax.legend()
+
         st.pyplot(fig)
 
     # Cluster statistics
@@ -139,10 +146,11 @@ def evaluate_clusters(df, labels, clustering_method, kmeans=None):
             cluster_center = kmeans.cluster_centers_[label]
             st.write(f"Cluster center: {cluster_center}")
         elif clustering_method == 'DBSCAN':
-            cluster_data = df_pca[labels == label]
-            cluster_center = cluster_data.mean(axis=0)
-            cluster_density = sum(labels == label) / (df_pca.loc[labels == label].apply(lambda x: np.linalg.norm(x - cluster_center), axis=1).mean())
-            st.write(f"Cluster density: {cluster_density}")
+            cluster_data = df[labels == label]
+            if not cluster_data.empty:
+                cluster_center = cluster_data.mean(axis=0)
+                cluster_density = sum(labels == label) / (cluster_data.apply(lambda x: np.linalg.norm(x - cluster_center), axis=1).mean())
+                st.write(f"Cluster density: {cluster_density}")
 
 def plot_clusters(df, labels, n_clusters):
     if len(df.columns) >= 2:
@@ -246,6 +254,8 @@ def prediction(df, copy_df):
             st.write("Model Accuracy:", accuracy_score(y_test, y_pred))
 
 def main():
+    # File upload
+    uploaded_file = st.file_uploader("Choose a CSV file", type="csv")
     if uploaded_file is not None:
         df = pd.read_csv(uploaded_file, header=None)
         num_columns = len(df.columns)
@@ -278,6 +288,5 @@ def main():
         st.warning("Please upload a CSV file to proceed.")
 
 if __name__ == "__main__":
-    # File upload
-    uploaded_file = st.file_uploader("Choose a CSV file", type="csv")
     main()
+
