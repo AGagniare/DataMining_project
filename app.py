@@ -20,9 +20,9 @@ def handle_missing_values(df, method):
     elif method == "Delete columns":
         df_cleaned = df.dropna(axis=1)
     elif method == "Replace with mean":
-        df_cleaned = df.fillna(df.mean())
+        df_cleaned = df.fillna(df.mean(numeric_only=True))
     elif method == "Replace with median":
-        df_cleaned = df.fillna(df.median())
+        df_cleaned = df.fillna(df.median(numeric_only=True))
     elif method == "Replace with mode":
         df_cleaned = df.fillna(df.mode().iloc[0])
     elif method == "KNN Imputation":
@@ -182,17 +182,17 @@ def clustering(df):
             plot_clusters(new_df, labels, -1)
         evaluate_clusters(new_df, labels, 'DBSCAN')
 
-def prediction(df):
+def prediction(df, copy_df):
     st.subheader("Prediction")
     prediction_option = st.selectbox("Choose prediction algorithm", ["Linear Regression", "Decision Tree Regression", "Random Forest Classification"])
 
     if prediction_option == "Linear Regression":
         feature_cols = st.multiselect("Select feature columns", df.columns)
-        target_col = st.selectbox("Select target column", df.columns)
+        target_col = st.selectbox("Select target column", copy_df.columns)
 
         if feature_cols and target_col:
             X = df[feature_cols]
-            y = df[target_col]
+            y = copy_df[target_col]
 
             model = LinearRegression()
             model.fit(X, y)
@@ -203,11 +203,11 @@ def prediction(df):
 
     elif prediction_option == "Decision Tree Regression":
         feature_cols = st.multiselect("Select feature columns", df.columns)
-        target_col = st.selectbox("Select target column", df.columns)
+        target_col = st.selectbox("Select target column", copy_df.columns)
 
         if feature_cols and target_col:
             X = df[feature_cols]
-            y = df[target_col]
+            y = copy_df[target_col]
 
             model = DecisionTreeRegressor()
             model.fit(X, y)
@@ -217,11 +217,11 @@ def prediction(df):
 
     elif prediction_option == "Random Forest Classification":
         feature_cols = st.multiselect("Select feature columns", df.columns)
-        target_col = st.selectbox("Select target column", df.columns)
+        target_col = st.selectbox("Select target column", copy_df.columns)
 
         if feature_cols and target_col:
             X = df[feature_cols]
-            y = df[target_col]
+            y = copy_df[target_col]
 
             X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=5)
 
@@ -264,30 +264,41 @@ def determine_optimal_clusters(df):
     st.write("Optimal number of clusters based on Calinski-Harabasz Index:", ch_scores.index(max(ch_scores)) + 2)
     st.write("Optimal number of clusters based on Davies-Bouldin Index:", db_scores.index(min(db_scores)) + 2)
 
-# Upload CSV file
-uploaded_file = st.file_uploader("Choose a CSV file", type="csv")
-if uploaded_file:
-    header = st.text_input("Enter header row number", value="0")
-    sep = st.text_input("Enter separator (e.g., , or ;)", value=",")
-    df = pd.read_csv(uploaded_file, header=None, sep=sep)
-    
-    # Rename columns
-    num_columns = len(df.columns)
-    column_names = [f"Feature{i}" for i in range(num_columns - 1)] + ["Class"]
-    df.columns = column_names
-    
-    copy_df = df.copy(deep=True)
+st.cache_resource
+def main():
+    # Upload CSV file
+    uploaded_file = st.file_uploader("Choose a CSV file", type="csv")
+    if uploaded_file:
+        # header = st.text_input("Enter header row number", value="0")
+        sep = st.text_input("Enter separator (e.g., , or ;)", value=",")
+        df = pd.read_csv(uploaded_file, header=None, sep=sep)
+            
+        # Rename columns
+        num_columns = len(df.columns)
+        column_names = [f"Feature{i}" for i in range(num_columns - 1)] + ["Class"]
+        df.columns = column_names
+            
+        copy_df = df.copy(deep=True)
 
-    data_exploration(copy_df)
+        # Remove and store target column
+        target_col = column_names[-1]
+        df = df.drop(target_col, axis=1)
 
-    df = handle_missing_values_ui(copy_df)
+        data_exploration(copy_df)
 
-    df = normalize_data_ui(df)
+        df = handle_missing_values_ui(df)
 
-    visualize_data(df)
+        df = normalize_data_ui(df)
 
-    # clustering(df)
+        visualize_data(df)
 
-    # determine_optimal_clusters(df)
+        clustering(df)
 
-    prediction(df)
+        determine_optimal_clusters(df)
+
+        prediction(df, copy_df)
+
+
+# main function
+if __name__ == "__main__":
+    main()
