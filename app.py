@@ -11,6 +11,8 @@ from sklearn.tree import DecisionTreeRegressor
 from sklearn.metrics import calinski_harabasz_score, davies_bouldin_score, accuracy_score
 from sklearn.decomposition import PCA
 from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LogisticRegression
+from sklearn.preprocessing import LabelEncoder
 
 st.title("Data Mining Project by Gagniare Arthur & Aali Andella Mohamed")
 
@@ -144,22 +146,6 @@ def evaluate_clusters(df, labels, clustering_method, kmeans=None):
             cluster_density = sum(labels == label) / (df_pca.loc[labels == label].apply(lambda x: np.linalg.norm(x - cluster_center), axis=1).mean())
             st.write(f"Cluster density: {cluster_density}")
 
-def plot_clusters(df, labels, n_clusters):
-    if len(df.columns) >= 2:
-        col1 = st.selectbox("Select X-axis column", df.columns)
-        col2 = st.selectbox("Select Y-axis column", df.columns)
-
-        fig, ax = plt.subplots()
-        for cluster in range(n_clusters if n_clusters != -1 else max(labels) + 1):
-            cluster_data = df.loc[labels == cluster, [col1, col2]]
-            ax.scatter(cluster_data[col1], cluster_data[col2], label=f"Cluster {cluster}")
-        ax.set_xlabel(col1)
-        ax.set_ylabel(col2)
-        ax.legend()
-        st.pyplot(fig)
-    else:
-        st.warning("Not enough columns for 2D visualization. Minimum 2 columns required.")
-
 # Updated clustering function with evaluation
 def clustering(df):
     st.subheader("Clustering")
@@ -176,8 +162,7 @@ def clustering(df):
         st.write("Clustering results:")
         st.write(new_df)
         if show_cluster_plot:
-            plot_clusters(new_df, labels, n_clusters)
-        evaluate_clusters(new_df, labels, 'K-Means', kmeans)
+            evaluate_clusters(new_df, labels, 'K-Means', kmeans)
 
     elif clustering_option == "DBSCAN":
         eps = st.slider("Select epsilon value", 0.1, 10.0, 3.5)
@@ -188,61 +173,39 @@ def clustering(df):
         st.write("Clustering results:")
         st.write(new_df)
         if show_cluster_plot:
-            plot_clusters(new_df, labels, -1)
-        evaluate_clusters(new_df, labels, 'DBSCAN')
+            evaluate_clusters(new_df, labels, 'DBSCAN')
 
-def prediction(df, copy_df):
+def prediction(df, copy_df, target_col):
     st.subheader("Prediction")
-    prediction_option = st.selectbox("Choose prediction algorithm", ["Linear Regression", "Decision Tree Regression", "Random Forest Classification"])
+    prediction_option = st.selectbox("Choose prediction algorithm", ["Random Forest Classification", "Logistic Regression"])
+    feature_cols = st.multiselect("Select feature columns", df.columns)
 
-    if prediction_option == "Linear Regression":
-        feature_cols = st.multiselect("Select feature columns", df.columns)
-        target_col = st.selectbox("Select target column", copy_df.columns)
+    if feature_cols and target_col:
+        X = df[feature_cols]
+        y = copy_df[target_col]
 
-        if feature_cols and target_col:
-            X = df[feature_cols]
-            y = copy_df[target_col]
+        # Encode string labels to integers
+        label_encoder = LabelEncoder()
+        y_encoded = label_encoder.fit_transform(y)
 
-            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-            model = LinearRegression()
-            model.fit(X_train, y_train)
-            y_pred = model.predict(X_test)
+        X_train, X_test, y_train, y_test = train_test_split(X, y_encoded, test_size=0.2, random_state=5)
 
-            st.write("Prediction results:")
-            st.write(pd.DataFrame({"Actual": y_test, "Predicted": y_pred}))
-            st.write("Model Coefficients:", model.coef_)
-
-    elif prediction_option == "Decision Tree Regression":
-        feature_cols = st.multiselect("Select feature columns", df.columns)
-        target_col = st.selectbox("Select target column", copy_df.columns)
-
-        if feature_cols and target_col:
-            X = df[feature_cols]
-            y = copy_df[target_col]
-
-            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-            model = DecisionTreeRegressor()
-            model.fit(X_train, y_train)
-            y_pred = model.predict(X_test)
-
-            st.write("Prediction results:")
-            st.write(pd.DataFrame({"Actual": y_test, "Predicted": y_pred}))
-
-    elif prediction_option == "Random Forest Classification":
-        feature_cols = st.multiselect("Select feature columns", df.columns)
-        target_col = st.selectbox("Select target column", copy_df.columns)
-
-        if feature_cols and target_col:
-            X = df[feature_cols]
-            y = copy_df[target_col]
-
-            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+        if prediction_option == "Random Forest Classification":
             model = RandomForestClassifier()
             model.fit(X_train, y_train)
             y_pred = model.predict(X_test)
 
             st.write("Prediction results:")
-            st.write(pd.DataFrame({"Actual": y_test, "Predicted": y_pred}))
+            st.write(pd.DataFrame({"Actual": label_encoder.inverse_transform(y_test), "Predicted": label_encoder.inverse_transform(y_pred)}))
+            st.write("Model Accuracy:", accuracy_score(y_test, y_pred))
+
+        elif prediction_option == "Logistic Regression":
+            model = LogisticRegression()
+            model.fit(X_train, y_train)
+            y_pred = model.predict(X_test)
+
+            st.write("Prediction results:")
+            st.write(pd.DataFrame({"Actual": label_encoder.inverse_transform(y_test), "Predicted": label_encoder.inverse_transform(y_pred)}))
             st.write("Model Accuracy:", accuracy_score(y_test, y_pred))
 
 def main():
@@ -271,9 +234,11 @@ def main():
         if normalized_df is not None:
             st.session_state.normalized_df = normalized_df
 
+        visualize_data(st.session_state.normalized_df if st.session_state.normalized_df is not None else st.session_state.cleaned_df if st.session_state.cleaned_df is not None else st.session_state.df)
+
         # Clustering and Prediction
         clustering(st.session_state.normalized_df if st.session_state.normalized_df is not None else st.session_state.cleaned_df if st.session_state.cleaned_df is not None else st.session_state.df)
-        prediction(st.session_state.normalized_df if st.session_state.normalized_df is not None else st.session_state.cleaned_df if st.session_state.cleaned_df is not None else df, st.session_state.copy_df)
+        prediction(st.session_state.normalized_df if st.session_state.normalized_df is not None else st.session_state.cleaned_df if st.session_state.cleaned_df is not None else df, st.session_state.copy_df, target_col)
     else:
         st.warning("Please upload a CSV file to proceed.")
 

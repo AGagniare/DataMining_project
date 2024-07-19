@@ -15,4 +15,4 @@ This project is an interactive web application developed using Streamlit to anal
 ## Setup and Execution
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/data-mining-project.git
+   git clone https://github.com/AGagniare/DataMining_project.git
